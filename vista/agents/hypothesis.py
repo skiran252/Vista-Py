@@ -1,6 +1,6 @@
 import json
 from typing import List, Literal
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from vista.llm.client import LLMClient
 from vista.core.example import Example
 
@@ -63,9 +63,15 @@ TaxonomyID = Literal[
 ]
 
 class Hypothesis(BaseModel):
-    tag: TaxonomyID = Field(description="The exact id from the Error Taxonomy")
+    model_config = {"populate_by_name": True}
+    
+    tag: TaxonomyID = Field(
+        description="The exact id from the Error Taxonomy",
+        alias="tag",
+        validation_alias=AliasChoices("tag", "category", "id", "taxonomy_id")
+    )
     description: str = Field(description="One or two sentences describing the specific root cause")
-    fix: str = Field(description="One or two sentences describing how to fix the prompt")
+    fix: str = Field(default="", description="One or two sentences describing how to fix the prompt")
 
 class HypothesisResponse(BaseModel):
     hypotheses: List[Hypothesis]

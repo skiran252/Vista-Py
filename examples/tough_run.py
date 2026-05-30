@@ -63,7 +63,9 @@ async def main():
         return 1.0 if expected in actual else 0.0
 
     # Initialize optimizer with OpenRouter
-    optimizer = VistaOptimizer(model_name="openrouter/openai/gpt-oss-120b:free")
+    optimizer = VistaOptimizer(
+        model_name="openrouter/moonshotai/kimi-k2.6:free", api_base="https://openrouter.ai/api/v1"
+    )
 
     try:
         optimized_module = await optimizer.optimize(

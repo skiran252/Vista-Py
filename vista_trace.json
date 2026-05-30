@@ -1,43 +1,29 @@
 [
   {
     "iteration": 0,
-    "instructions": "Answer the following reasoning question.",
-    "score": 0.75
+    "instructions": "You are a customer support AI. Analyze the user's message and extract the intent and the order ID.\nAllowed Intents: [Return_Request, Cancel_Order, Track_Package]\nOutput strictly in this JSON format: {\"intent\": \"...\", \"order_id\": \"...\"}",
+    "score": 0.2
   },
   {
     "iteration": 1,
-    "parent_score": 0.75,
+    "parent_score": 0.2,
     "strategy": "heuristics",
     "hypotheses_explored": [
       {
-        "tag": "reasoning_strategy",
-        "desc": "The prompt lacks instructions to prioritize practicality and user experience when reasoning through options for answering the question."
+        "tag": "edge_case_handling",
+        "desc": "The prompt does not tell the model how to handle missing or ambiguous order IDs, so it always tries to emit a string (or null) for `order_id`. In Sample\u202f1 the model has no guidance to output `null`, causing a failure to produce any answer."
       },
       {
-        "tag": "missing_domain_knowledge",
-        "desc": "The prompt does not include domain knowledge regarding typical behaviors for very short distances, causing an over-optimistic evaluation of walking versus driving."
-      }
-    ],
-    "best_candidate_score": 0.75,
-    "best_hypothesis_tag": "",
-    "new_instructions": "Answer the following reasoning question. When providing your reasoning, prioritize practicality and user experience. Consider factors like convenience, distance, and context when choosing your answer."
-  },
-  {
-    "iteration": 2,
-    "parent_score": 0.75,
-    "strategy": "heuristics",
-    "hypotheses_explored": [
+        "tag": "format_and_syntax",
+        "desc": "The output schema is wrapped inside an extra JSON string in Sample\u202f2 (the model returns `{\"output\": \"{...}\"}`) because the prompt does not forbid additional envelope fields. This allows the model to add a top\u2011level key like `output`."
+      },
       {
         "tag": "task_instruction_clarity",
-        "desc": "The prompt does not clarify whether practical environmental implications should be considered in answering questions like this, leading to the selection of a less practical option."
-      },
-      {
-        "tag": "reasoning_strategy",
-        "desc": "The reasoning strategy employed by the system overly focuses on moral reasoning and neglects the straightforwardness of the question, leading to outcomes misaligned with expected answers."
+        "desc": "The intent mapping is ambiguous for messages that mention both a return and a cancellation of a return. The prompt assumes a single intent, leading to the wrong classification in Sample\u202f3 where the model picks `Cancel_Order` instead of `Track_Package` as required by the expected output."
       }
     ],
-    "best_candidate_score": 0.75,
+    "best_candidate_score": 0.2,
     "best_hypothesis_tag": "",
-    "new_instructions": "Provide a direct and concise answer to the question asked, focusing solely on the specific details provided in the question without introducing external considerations."
+    "new_instructions": "You are a customer support AI. Analyze the user's message and extract the intent and the order ID.\nAllowed Intents: [Return_Request, Cancel_Order, Track_Package]\nYour response must be a JSON object **with ONLY** the keys `intent` and `order_id`. Do not include any other fields, wrappers, or surrounding text.\nOutput format:\n```json\n{\"intent\": \"...\", \"order_id\": \"...\"}\n```"
   }
 ]

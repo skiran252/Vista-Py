@@ -13,20 +13,29 @@ class Evaluator:
         self, 
         module: Predict, 
         example: Example, 
-        metric: Callable[[Example, dict], float]
+        metric: Callable[[Example, dict], float],
+        max_retries: int = 3
     ) -> Tuple[float, Example]:
-        """Evaluates a single example."""
+        """Evaluates a single example with retry on rate limits."""
         async with self.semaphore:
-            try:
-                # Add a delay to help with GitHub Models burst rate limits
-                await asyncio.sleep(2.0)
-                actual_output = await module(self.llm_client, **example.inputs)
-                evaluated_example = example.with_output(actual_output)
-                score = metric(evaluated_example, actual_output)
-                return score, evaluated_example
-            except Exception as e:
-                print(f"Error evaluating example: {e}")
-                return 0.0, example
+            for attempt in range(max_retries):
+                try:
+                    await asyncio.sleep(2.0)
+                    actual_output = await module(self.llm_client, **example.inputs)
+                    evaluated_example = example.with_output(actual_output)
+                    score = metric(evaluated_example, actual_output)
+                    return score, evaluated_example
+                except Exception as e:
+                    error_str = str(e).lower()
+                    is_retryable = "rate" in error_str or "429" in error_str or "temporarily" in error_str
+                    if is_retryable and attempt < max_retries - 1:
+                        wait = 2 ** attempt * 5  # 5s, 10s, 20s
+                        print(f"Rate limited, retrying in {wait}s (attempt {attempt + 1}/{max_retries})...")
+                        await asyncio.sleep(wait)
+                    else:
+                        print(f"Error evaluating example: {e}")
+                        return 0.0, example
+            return 0.0, example
 
     async def evaluate_minibatch(
         self, 
