@@ -1,0 +1,43 @@
+[
+  {
+    "iteration": 0,
+    "instructions": "Answer the following reasoning question.",
+    "score": 0.75
+  },
+  {
+    "iteration": 1,
+    "parent_score": 0.75,
+    "strategy": "heuristics",
+    "hypotheses_explored": [
+      {
+        "tag": "reasoning_strategy",
+        "desc": "The prompt lacks instructions to prioritize practicality and user experience when reasoning through options for answering the question."
+      },
+      {
+        "tag": "missing_domain_knowledge",
+        "desc": "The prompt does not include domain knowledge regarding typical behaviors for very short distances, causing an over-optimistic evaluation of walking versus driving."
+      }
+    ],
+    "best_candidate_score": 0.75,
+    "best_hypothesis_tag": "",
+    "new_instructions": "Answer the following reasoning question. When providing your reasoning, prioritize practicality and user experience. Consider factors like convenience, distance, and context when choosing your answer."
+  },
+  {
+    "iteration": 2,
+    "parent_score": 0.75,
+    "strategy": "heuristics",
+    "hypotheses_explored": [
+      {
+        "tag": "task_instruction_clarity",
+        "desc": "The prompt does not clarify whether practical environmental implications should be considered in answering questions like this, leading to the selection of a less practical option."
+      },
+      {
+        "tag": "reasoning_strategy",
+        "desc": "The reasoning strategy employed by the system overly focuses on moral reasoning and neglects the straightforwardness of the question, leading to outcomes misaligned with expected answers."
+      }
+    ],
+    "best_candidate_score": 0.75,
+    "best_hypothesis_tag": "",
+    "new_instructions": "Provide a direct and concise answer to the question asked, focusing solely on the specific details provided in the question without introducing external considerations."
+  }
+]

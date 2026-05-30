@@ -1,0 +1,83 @@
+import asyncio
+import os
+import sys
+
+from dotenv import load_dotenv
+
+# Ensure vista package is in path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from vista.core.module import Predict
+from vista.core.example import Example
+from vista.optimizers.vista import VistaOptimizer
+
+
+async def main():
+    print("Initializing Tough Reasoning VISTA Run...")
+
+    # Load .env variables explicitly from parent directory
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    load_dotenv(dotenv_path=env_path)
+
+    if "OPENROUTER_API_KEY" in os.environ:
+        print("Loaded OpenRouter Token from .env")
+    else:
+        print("WARNING: OPENROUTER_API_KEY not found in .env!")
+
+    module = Predict(
+        "question -> answer", instructions="Answer the following reasoning question."
+    )
+
+    # Cognitive Reflection Test + Trick Questions
+    dataset = [
+        Example(
+            inputs={
+                "question": "I have a car wash in 10 meters, should I walk or go by car?"
+            },
+            target={"answer": "car"},
+        ),
+        Example(
+            inputs={
+                "question": "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost in cents?"
+            },
+            target={"answer": "5"},
+        ),
+        Example(
+            inputs={
+                "question": "If it takes 5 machines 5 minutes to make 5 widgets, how many minutes would it take 100 machines to make 100 widgets?"
+            },
+            target={"answer": "5"},
+        ),
+        Example(
+            inputs={
+                "question": "In a lake, there is a patch of lily pads. Every day, the patch doubles in size. If it takes 48 days for the patch to cover the entire lake, how many days would it take for the patch to cover half of the lake?"
+            },
+            target={"answer": "47"},
+        ),
+    ]
+
+    def contains_match(example: Example, actual_output: dict) -> float:
+        expected = example.target.get("answer", "").strip().lower()
+        actual = str(actual_output.get("answer", "")).strip().lower()
+        # For reasoning questions, we check if the target keyword is in the output
+        return 1.0 if expected in actual else 0.0
+
+    # Initialize optimizer with OpenRouter
+    optimizer = VistaOptimizer(model_name="openrouter/openai/gpt-oss-120b:free")
+
+    try:
+        optimized_module = await optimizer.optimize(
+            module=module,
+            trainset=dataset,
+            metric=contains_match,
+            epochs=2,
+            k_hypotheses=2,
+        )
+        print("\nFinal optimized instructions:")
+        print(optimized_module.signature.instructions)
+    except Exception as e:
+        print(f"Error during optimization loop: {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
