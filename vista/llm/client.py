@@ -6,6 +6,11 @@ from typing import Any, Dict
 
 from vista.core.signature import Signature
 
+# Standard JSON mode — works on all providers (Groq, OpenRouter, OpenAI, etc.)
+# Unlike passing a Pydantic model as response_format, this does NOT get
+# translated into tool/function calls by litellm.
+JSON_MODE = {"type": "json_object"}
+
 
 class LLMClient:
     """Wrapper around litellm for structured completions."""
@@ -14,17 +19,18 @@ class LLMClient:
         self.model_name = model_name
         self.api_base = api_base
 
-    async def _call_llm(self, messages: list, response_format=None) -> str:
+    async def _call_llm(self, messages: list) -> str:
         """
         Core LLM call with unified error handling.
-        Returns the raw string content from the LLM response.
+        Uses JSON mode for structured output — avoids litellm converting
+        Pydantic models into tool calls on providers that don't support
+        native JSON schema response_format (e.g., Groq).
         """
         completion_kwargs = {
             "model": self.model_name,
             "messages": messages,
+            "response_format": JSON_MODE,
         }
-        if response_format:
-            completion_kwargs["response_format"] = response_format
         if self.api_base:
             completion_kwargs["api_base"] = self.api_base
 
@@ -45,6 +51,25 @@ class LLMClient:
             except (json.JSONDecodeError, KeyError):
                 raise e
 
+    def _inject_schema(
+        self, messages: list, response_model: type[BaseModel]
+    ) -> list:
+        """Injects the JSON schema into the first system message so the LLM
+        knows the exact output structure without relying on tool calls."""
+        schema_str = json.dumps(response_model.model_json_schema(), indent=2)
+        schema_instruction = (
+            f"\n\nYou MUST respond with valid JSON matching this schema:\n"
+            f"```json\n{schema_str}\n```"
+        )
+
+        # Append to existing system message or prepend a new one
+        messages = [m.copy() for m in messages]
+        if messages and messages[0]["role"] == "system":
+            messages[0]["content"] += schema_instruction
+        else:
+            messages.insert(0, {"role": "system", "content": schema_instruction})
+        return messages
+
     async def predict(
         self, signature: Signature, inputs: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -62,11 +87,13 @@ class LLMClient:
             {"role": "user", "content": user_content},
         ]
 
-        # Dynamic Pydantic model for enforcing output schema
+        # Build a Pydantic model for the schema, but inject it into the
+        # prompt instead of passing it as response_format
         output_fields = {f.name: (f.type_, ...) for f in signature.outputs}
         OutputModel = create_model("OutputModel", **output_fields)
+        messages = self._inject_schema(messages, OutputModel)
 
-        raw_output = await self._call_llm(messages, response_format=OutputModel)
+        raw_output = await self._call_llm(messages)
 
         if raw_output is None:
             return {signature.outputs[0].name: ""}
@@ -79,7 +106,8 @@ class LLMClient:
         self, messages: list, response_model: type[BaseModel]
     ) -> BaseModel:
         """Generates a direct Pydantic model response (used by agents)."""
-        raw = await self._call_llm(messages, response_format=response_model)
+        messages = self._inject_schema(messages, response_model)
+        raw = await self._call_llm(messages)
 
         if raw is None:
             raise ValueError("LLM returned empty response content")
