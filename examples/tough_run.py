@@ -1,21 +1,14 @@
 import asyncio
 import os
-import sys
 
 from dotenv import load_dotenv
 
-# Ensure vista package is in path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from vista.core.module import Predict
-from vista.core.example import Example
-from vista.optimizers.vista import VistaOptimizer
+from vista import Predict, Example, VistaOptimizer
 
 
 async def main():
     print("Initializing Tough Reasoning VISTA Run...")
 
-    # Load .env variables explicitly from parent directory
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
@@ -59,12 +52,11 @@ async def main():
     def contains_match(example: Example, actual_output: dict) -> float:
         expected = example.target.get("answer", "").strip().lower()
         actual = str(actual_output.get("answer", "")).strip().lower()
-        # For reasoning questions, we check if the target keyword is in the output
         return 1.0 if expected in actual else 0.0
 
-    # Initialize optimizer with OpenRouter
     optimizer = VistaOptimizer(
-        model_name="openrouter/moonshotai/kimi-k2.6:free", api_base="https://openrouter.ai/api/v1"
+        model_name="openrouter/moonshotai/kimi-k2.6:free",
+        api_base="https://openrouter.ai/api/v1",
     )
 
     try:

@@ -1,21 +1,14 @@
 import asyncio
 import os
-import sys
 
 from dotenv import load_dotenv
 
-# Ensure vista package is in path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from vista.core.module import Predict
-from vista.core.example import Example
-from vista.optimizers.vista import VistaOptimizer
+from vista import Predict, Example, VistaOptimizer
 
 
 async def main():
     print("Initializing Mock VISTA Run...")
 
-    # Load .env variables explicitly from parent directory
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
@@ -40,7 +33,6 @@ async def main():
         actual = str(actual_output.get("answer", "")).strip()
         return 1.0 if expected == actual else 0.0
 
-    # Initialize optimizer with github models
     optimizer = VistaOptimizer(model_name="github/gpt-4o")
 
     try:

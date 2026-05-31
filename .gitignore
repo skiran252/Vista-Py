@@ -8,4 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
-.env 
+.env
+
+# Runtime artifacts
+vista_trace.json
+

@@ -1,28 +1,21 @@
 import asyncio
 import os
-import sys
 
 from dotenv import load_dotenv
 
-# Ensure vista package is in path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from vista.core.module import Predict
-from vista.core.example import Example
-from vista.optimizers.vista import VistaOptimizer
+from vista import Predict, Example, VistaOptimizer
 
 
 async def main():
     print("Initializing Customer Support Intent VISTA Run...")
 
-    # Load .env variables explicitly from parent directory
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
-    if "OPENROUTER_API_KEY" in os.environ:
-        print("Loaded OpenRouter Token from .env")
+    if "GROQ_API_KEY" in os.environ:
+        print("Loaded Groq Token from .env")
     else:
-        print("WARNING: OPENROUTER_API_KEY not found in .env!")
+        print("WARNING: GROQ_API_KEY not found in .env!")
 
     initial_instructions = """You are a customer support AI. Analyze the user's message and extract the intent and the order ID.
 Allowed Intents: [Return_Request, Cancel_Order, Track_Package]
@@ -71,18 +64,15 @@ Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
         actual_order_id = actual_output.get("order_id")
 
         score = 0.0
-        # 0.5 points for correct intent
         if actual_intent == expected_intent:
             score += 0.5
-        # 0.5 points for correct order_id (including None/null)
         if actual_order_id == expected_order_id:
             score += 0.5
 
         return score
 
-    # Initialize optimizer with OpenRouter
     optimizer = VistaOptimizer(
-        model_name="openrouter/openai/gpt-oss-20b:free",
+        model_name="groq/qwen/qwen3-32b",
     )
 
     try:
