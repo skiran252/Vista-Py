@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 
@@ -22,3 +23,5 @@ class VistaConfig:
     max_workers: int = 4
     # Reproducibility
     random_seed: int = 0
+    # Global LLM rate limit (requests per minute).
+    requests_per_minute: float = float(os.environ.get("VISTA_RPM", "15.0"))

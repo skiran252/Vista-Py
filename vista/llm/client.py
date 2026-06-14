@@ -8,6 +8,11 @@ from typing import Any, Dict
 
 from vista.core.signature import Signature
 
+import os
+import time
+
+from aiolimiter import AsyncLimiter
+
 # Standard JSON mode — works on all providers (Groq, OpenRouter, OpenAI, etc.)
 # Unlike passing a Pydantic model as response_format, this does NOT get
 # translated into tool/function calls by litellm.
@@ -17,9 +22,25 @@ JSON_MODE = {"type": "json_object"}
 class LLMClient:
     """Wrapper around litellm for structured completions."""
 
-    def __init__(self, model_name: str = "gpt-4o", api_base: str = None):
+    _global_rate_limiter = None
+
+    def __init__(self, model_name: str = "gpt-4o", api_base: str = None, rpm: float = None):
         self.model_name = model_name
         self.api_base = api_base
+
+        # Configure the global rate limiter if specified or set in environment
+        env_rpm = os.environ.get("VISTA_RPM")
+        target_rpm = rpm
+        if target_rpm is None and env_rpm:
+            try:
+                target_rpm = float(env_rpm)
+            except ValueError:
+                pass
+
+        if target_rpm is not None and target_rpm > 0:
+            if LLMClient._global_rate_limiter is None or LLMClient._global_rate_limiter.time_period != (60.0 / target_rpm):
+                # Enforce a burst size of 1 with a delay between requests to prevent burst/concurrency limits.
+                LLMClient._global_rate_limiter = AsyncLimiter(1, 60.0 / target_rpm)
 
     async def _call_llm(self, messages: list) -> str:
         """
@@ -28,6 +49,7 @@ class LLMClient:
         Pydantic models into tool calls on providers that don't support
         native JSON schema response_format (e.g., Groq).
         """
+
         completion_kwargs = {
             "model": self.model_name,
             "messages": messages,
@@ -40,6 +62,8 @@ class LLMClient:
         max_retries = 5
         for attempt in range(max_retries):
             try:
+                if LLMClient._global_rate_limiter:
+                    await LLMClient._global_rate_limiter.acquire()
                 response = await litellm.acompletion(**completion_kwargs)
                 return response.choices[0].message.content
             except Exception as e:

@@ -33,7 +33,7 @@ class VistaOptimizer:
         config: VistaConfig = None,
     ):
         self.config = config or VistaConfig()
-        self.llm_client = LLMClient(model_name, api_base=api_base)
+        self.llm_client = LLMClient(model_name, api_base=api_base, rpm=self.config.requests_per_minute)
         self.hypothesis_agent = HypothesisAgent(self.llm_client)
         self.reflection_agent = ReflectionAgent(self.llm_client)
         self.evaluator = Evaluator(self.llm_client, max_concurrent=self.config.max_workers)

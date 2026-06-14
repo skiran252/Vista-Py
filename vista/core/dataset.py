@@ -18,16 +18,10 @@ class Dataset:
         shuffled = list(examples)
         self._rng.shuffle(shuffled)
 
-        # Clamp sizes to available data
-        total_needed = train_size + val_size
-        if len(shuffled) < total_needed:
-            # Use a proportional split when data is scarce
-            ratio = train_size / total_needed
-            train_size = max(1, int(len(shuffled) * ratio))
-            val_size = max(1, len(shuffled) - train_size)
-
-        self.train: List[Example] = shuffled[:train_size]
-        self.val: List[Example] = shuffled[train_size : train_size + val_size]
+        # Clamp sizes to available data. If total_needed exceeds available examples,
+        # we allow the train and val sets to overlap rather than shrinking them proportionally.
+        self.train: List[Example] = shuffled[:min(train_size, len(shuffled))]
+        self.val: List[Example] = shuffled[-min(val_size, len(shuffled)):]
 
     def sample_minibatch(self, size: int) -> List[Example]:
         """Sample a minibatch M ~ D_train with |M| = size."""

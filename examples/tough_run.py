@@ -7,15 +7,17 @@ from vista import Predict, Example, VistaOptimizer, VistaConfig
 
 
 async def main():
-    print("Initializing Tough Reasoning VISTA Run...")
+    print("Initializing Tough Reasoning VISTA Run (Lightning AI)...")
 
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
-    if "OPENROUTER_API_KEY" in os.environ:
-        print("Loaded OpenRouter Token from .env")
-    else:
-        print("WARNING: OPENROUTER_API_KEY not found in .env!")
+    if "LIGHTNING_API_KEY" not in os.environ:
+        print("WARNING: LIGHTNING_API_KEY not found in .env!")
+        return
+
+    # Lightning AI uses OpenAI-compatible endpoint
+    os.environ["OPENAI_API_KEY"] = os.environ["LIGHTNING_API_KEY"]
 
     module = Predict(
         "question -> answer", instructions="Answer the following reasoning question."
@@ -65,8 +67,8 @@ async def main():
     )
 
     optimizer = VistaOptimizer(
-        model_name="openrouter/moonshotai/kimi-k2.6:free",
-        api_base="https://openrouter.ai/api/v1",
+        model_name="openai/gpt-4o",
+        api_base="https://lightning.ai/api/v1/",
         config=config,
     )
 

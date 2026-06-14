@@ -105,13 +105,12 @@ class ReflectionAgent:
         raw_output = ""
         parse_error = "Not yet attempted"
         task_input = json.dumps(example.inputs, indent=2)
+        candidate_prompt = ""
 
         for iteration in range(max_iterations):
             if iteration == 0:
                 # Run with no prompt to get natural model output
-                messages = [
-                    {"role": "user", "content": f"Solve this:\n{task_input}"}
-                ]
+                messages = [{"role": "user", "content": f"Solve this:\n{task_input}"}]
                 try:
                     raw_output = await llm_client._call_llm(messages)
                 except Exception as e:
@@ -131,7 +130,10 @@ class ReflectionAgent:
                 temp_module = Predict(
                     Signature.from_string(
                         " -> ".join(
-                            [",".join(example.inputs.keys()), ",".join(example.target.keys())]
+                            [
+                                ",".join(example.inputs.keys()),
+                                ",".join(example.target.keys()),
+                            ]
                         ),
                         candidate_prompt,
                     )

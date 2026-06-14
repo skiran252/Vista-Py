@@ -7,21 +7,25 @@ from vista import Predict, Example, VistaOptimizer, VistaConfig
 
 
 async def main():
-    print("Initializing Customer Support Intent VISTA Run...")
+    print("Initializing Customer Support Intent VISTA Run (Lightning AI)...")
 
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
-    if "GEMINI_API_KEY" in os.environ:
-        print("Loaded Gemini API Key from .env")
-    else:
-        print("WARNING: GEMINI_API_KEY not found in .env!")
+    if "LIGHTNING_API_KEY" not in os.environ:
+        print("WARNING: LIGHTNING_API_KEY not found in .env!")
+        return
+
+    # Lightning AI uses OpenAI-compatible endpoint
+    os.environ["OPENAI_API_KEY"] = os.environ["LIGHTNING_API_KEY"]
 
     initial_instructions = """You are a customer support AI. Analyze the user's message and extract the intent and the order ID.
 Allowed Intents: [Return_Request, Cancel_Order, Track_Package]
 Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
 
-    module = Predict("customer_message -> intent, order_id", instructions=initial_instructions)
+    module = Predict(
+        "customer_message -> intent, order_id", instructions=initial_instructions
+    )
 
     dataset = [
         Example(
@@ -82,7 +86,8 @@ Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
     )
 
     optimizer = VistaOptimizer(
-        model_name="gemini/gemma-4-31b-it",
+        model_name="openai/lightning-ai/gpt-oss-120b",
+        api_base="https://lightning.ai/api/v1/",
         config=config,
     )
 
