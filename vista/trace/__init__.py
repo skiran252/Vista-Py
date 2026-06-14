@@ -1,3 +1,3 @@
-from vista.trace.logger import TraceLogger
+from vista.trace.logger import TraceLogger, SemanticTraceTree, TraceNode, TraceEdge
 
-__all__ = ["TraceLogger"]
+__all__ = ["TraceLogger", "SemanticTraceTree", "TraceNode", "TraceEdge"]

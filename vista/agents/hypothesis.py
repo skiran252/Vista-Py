@@ -6,7 +6,7 @@ from vista.llm.client import LLMClient
 from vista.core.example import Example
 from vista.agents.formatting import format_failed_samples
 
-ERROR_TAXONOMY = """
+ERROR_TAXONOMY = """\
 - id: cot_field_ordering
   name: CoT / Output Field Ordering Defect
   description: The output schema requires the final answer before the reasoning steps, preventing chain-of-thought from influencing the result.
@@ -30,7 +30,8 @@ ERROR_TAXONOMY = """
   description: None of the predefined categories fit; discover and justify a latent failure mode.
 """
 
-HYPOTHESIS_PROMPT = """
+# Heuristic-guided prompt — uses the taxonomy (exploitation)
+HYPOTHESIS_PROMPT = """\
 You are an expert prompt engineer analyzing why a system prompt causes failures on certain inputs.
 
 CURRENT SYSTEM PROMPT:
@@ -38,6 +39,8 @@ CURRENT SYSTEM PROMPT:
 
 ERROR TAXONOMY:
 {error_taxonomy}
+
+{trace_context}
 
 FAILED SAMPLES:
 {failed_samples}
@@ -51,6 +54,35 @@ For EACH hypothesis:
 IMPORTANT:
 - Each hypothesis MUST address a DIFFERENT aspect of the failures.
 - Try to cover as many different taxonomy categories as possible.
+- Be specific about what exactly in the current prompt causes the failure.
+- If the optimization trace shows a category has been tried repeatedly with diminishing returns, \
+avoid that category and try unexplored ones.
+- If two categories seem to alternate without resolution, consider a joint hypothesis addressing both.
+"""
+
+# Free hypothesis prompt — no taxonomy constraint (exploration)
+FREE_HYPOTHESIS_PROMPT = """\
+You are an expert prompt engineer analyzing why a system prompt causes failures on certain inputs.
+
+CURRENT SYSTEM PROMPT:
+{curr_instructions}
+
+{trace_context}
+
+FAILED SAMPLES:
+{failed_samples}
+
+TASK: Analyze the failed samples and generate exactly 1 root-cause hypothesis.
+You are NOT constrained by any predefined taxonomy. Discover the failure mode freely.
+
+For your hypothesis:
+1. Invent a short descriptive tag (snake_case, max 4 words) for the failure mode you identified.
+2. Provide a concise description of the specific root cause.
+3. Suggest a concrete fix direction for the prompt.
+
+IMPORTANT:
+- Think outside the box. Look for failure modes that standard categories might miss.
+- Consider structural, semantic, or implicit issues in the prompt.
 - Be specific about what exactly in the current prompt causes the failure.
 """
 
@@ -68,8 +100,8 @@ TaxonomyID = Literal[
 class Hypothesis(BaseModel):
     model_config = {"populate_by_name": True}
 
-    tag: TaxonomyID = Field(
-        description="The exact id from the Error Taxonomy",
+    tag: str = Field(
+        description="The exact id from the Error Taxonomy, or a custom tag for free hypotheses",
         alias="tag",
         validation_alias=AliasChoices("tag", "category", "id", "taxonomy_id"),
     )
@@ -86,6 +118,10 @@ class HypothesisResponse(BaseModel):
     hypotheses: List[Hypothesis]
 
 
+class FreeHypothesisResponse(BaseModel):
+    hypotheses: List[Hypothesis]
+
+
 class HypothesisAgent:
     def __init__(self, llm_client: LLMClient):
         self.llm_client = llm_client
@@ -95,11 +131,15 @@ class HypothesisAgent:
         current_instructions: str,
         failed_examples: List[Example],
         num_hypotheses: int = 3,
+        trace_context: str = "",
     ) -> List[Hypothesis]:
+        """Generate heuristic-guided hypotheses using the error taxonomy."""
+        ctx = trace_context if trace_context else "No prior optimization history."
 
         prompt = HYPOTHESIS_PROMPT.format(
             curr_instructions=current_instructions,
             error_taxonomy=ERROR_TAXONOMY,
+            trace_context=ctx,
             failed_samples=format_failed_samples(failed_examples),
             num_hypotheses=num_hypotheses,
         )
@@ -111,3 +151,33 @@ class HypothesisAgent:
         )
 
         return response.hypotheses[:num_hypotheses]
+
+    async def generate_free_hypothesis(
+        self,
+        current_instructions: str,
+        failed_examples: List[Example],
+        trace_context: str = "",
+    ) -> Hypothesis:
+        """
+        Generate an unconstrained hypothesis (ε-exploration branch).
+        Not bound by the taxonomy — can discover novel failure modes.
+        """
+        ctx = trace_context if trace_context else "No prior optimization history."
+
+        prompt = FREE_HYPOTHESIS_PROMPT.format(
+            curr_instructions=current_instructions,
+            trace_context=ctx,
+            failed_samples=format_failed_samples(failed_examples),
+        )
+
+        messages = [{"role": "system", "content": prompt}]
+
+        response: FreeHypothesisResponse = await self.llm_client.generate_structured(
+            messages=messages, response_model=FreeHypothesisResponse
+        )
+
+        return response.hypotheses[0] if response.hypotheses else Hypothesis(
+            tag="unclassified_custom",
+            description="Free hypothesis generation failed",
+            fix="",
+        )

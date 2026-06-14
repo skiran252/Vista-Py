@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from vista import Predict, Example, VistaOptimizer
+from vista import Predict, Example, VistaOptimizer, VistaConfig
 
 
 async def main():
@@ -33,15 +33,24 @@ async def main():
         actual = str(actual_output.get("answer", "")).strip()
         return 1.0 if expected == actual else 0.0
 
-    optimizer = VistaOptimizer(model_name="github/gpt-4o")
+    # Configure with paper defaults, adjusted for small dataset
+    config = VistaConfig(
+        k=2,
+        budget=100,
+        minibatch_size=3,
+        train_size=3,
+        val_size=3,
+        restart_prob=0.2,
+        epsilon=0.1,
+    )
+
+    optimizer = VistaOptimizer(model_name="github/gpt-4o", config=config)
 
     try:
         optimized_module = await optimizer.optimize(
             module=module,
             trainset=dataset,
             metric=exact_match,
-            epochs=2,
-            k_hypotheses=2,
         )
         print("\nFinal optimized instructions:")
         print(optimized_module.signature.instructions)

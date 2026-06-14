@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from vista import Predict, Example, VistaOptimizer
+from vista import Predict, Example, VistaOptimizer, VistaConfig
 
 
 async def main():
@@ -54,9 +54,20 @@ async def main():
         actual = str(actual_output.get("answer", "")).strip().lower()
         return 1.0 if expected in actual else 0.0
 
+    config = VistaConfig(
+        k=2,
+        budget=150,
+        minibatch_size=4,
+        train_size=4,
+        val_size=4,
+        restart_prob=0.2,
+        epsilon=0.1,
+    )
+
     optimizer = VistaOptimizer(
         model_name="openrouter/moonshotai/kimi-k2.6:free",
         api_base="https://openrouter.ai/api/v1",
+        config=config,
     )
 
     try:
@@ -64,8 +75,6 @@ async def main():
             module=module,
             trainset=dataset,
             metric=contains_match,
-            epochs=2,
-            k_hypotheses=2,
         )
         print("\nFinal optimized instructions:")
         print(optimized_module.signature.instructions)

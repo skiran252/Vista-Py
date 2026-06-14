@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from vista import Predict, Example, VistaOptimizer
+from vista import Predict, Example, VistaOptimizer, VistaConfig
 
 
 async def main():
@@ -12,16 +12,16 @@ async def main():
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     load_dotenv(dotenv_path=env_path)
 
-    if "GROQ_API_KEY" in os.environ:
-        print("Loaded Groq Token from .env")
+    if "GEMINI_API_KEY" in os.environ:
+        print("Loaded Gemini API Key from .env")
     else:
-        print("WARNING: GROQ_API_KEY not found in .env!")
+        print("WARNING: GEMINI_API_KEY not found in .env!")
 
     initial_instructions = """You are a customer support AI. Analyze the user's message and extract the intent and the order ID.
 Allowed Intents: [Return_Request, Cancel_Order, Track_Package]
 Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
 
-    module = Predict("customer_message -> output", instructions=initial_instructions)
+    module = Predict("customer_message -> intent, order_id", instructions=initial_instructions)
 
     dataset = [
         Example(
@@ -71,8 +71,19 @@ Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
 
         return score
 
+    config = VistaConfig(
+        k=3,
+        budget=200,
+        minibatch_size=5,
+        train_size=5,
+        val_size=5,
+        restart_prob=0.2,
+        epsilon=0.1,
+    )
+
     optimizer = VistaOptimizer(
-        model_name="groq/qwen/qwen3-32b",
+        model_name="gemini/gemma-4-31b-it",
+        config=config,
     )
 
     try:
@@ -80,8 +91,6 @@ Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
             module=module,
             trainset=dataset,
             metric=strict_json_match,
-            epochs=3,
-            k_hypotheses=3,
         )
         print("\nFinal optimized instructions:")
         print(optimized_module.signature.instructions)
