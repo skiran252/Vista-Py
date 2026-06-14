@@ -108,7 +108,38 @@ class LLMClient:
     ) -> list:
         """Injects the JSON schema into the first system message so the LLM
         knows the exact output structure without relying on tool calls."""
-        schema = response_model.model_json_schema()
+        raw_schema = response_model.model_json_schema()
+
+        # Helper to inline $refs to avoid $defs which confuses smaller/open-source LLMs
+        def inline_refs(schema_dict: dict) -> dict:
+            defs = schema_dict.get("$defs", schema_dict.get("definitions", {}))
+
+            def resolve(node):
+                if isinstance(node, dict):
+                    if "$ref" in node:
+                        ref_path = node["$ref"]
+                        parts = ref_path.split("/")
+                        def_name = parts[-1]
+                        if def_name in defs:
+                            resolved_def = resolve(defs[def_name])
+                            merged = {**resolved_def}
+                            for k in ["title", "description"]:
+                                if k in node:
+                                    merged[k] = node[k]
+                            return merged
+                    return {k: resolve(v) for k, v in node.items()}
+                elif isinstance(node, list):
+                    return [resolve(item) for item in node]
+                return node
+
+            resolved = resolve(schema_dict)
+            if "$defs" in resolved:
+                del resolved["$defs"]
+            if "definitions" in resolved:
+                del resolved["definitions"]
+            return resolved
+
+        schema = inline_refs(raw_schema)
         schema_str = json.dumps(schema, indent=2)
 
         # Explicitly list required top-level keys so the model can't invent its own
@@ -174,8 +205,17 @@ class LLMClient:
             if raw is None:
                 raise ValueError("LLM returned empty response content")
             try:
+                # Try standard Pydantic parsing first
                 return response_model.model_validate_json(raw)
             except ValidationError as e:
+                # Attempt to repair the JSON if it is syntactically broken
+                from json_repair import repair_json
+                try:
+                    repaired = repair_json(raw)
+                    return response_model.model_validate_json(repaired)
+                except Exception:
+                    pass
+
                 last_error = e
                 if attempt < max_retries:
                     # Feed the error back so the model can self-correct
@@ -188,4 +228,30 @@ class LLMClient:
                         ),
                     })
 
-        raise last_error
+        # If we failed all retries, gracefully construct an empty/default model to prevent crashes
+        print(f"WARNING: JSON validation failed completely after {max_retries} retries. Falling back to default empty model.", flush=True)
+        try:
+            return response_model()
+        except ValidationError:
+            # If default constructor fails, build schema with dummy values based on field types
+            dummy_data = {}
+            for field_name, field_info in response_model.model_fields.items():
+                if field_info.is_required():
+                    origin = getattr(field_info.annotation, "__origin__", None)
+                    if origin is list:
+                        dummy_data[field_name] = []
+                    elif origin is dict:
+                        dummy_data[field_name] = {}
+                    elif field_info.annotation is str:
+                        dummy_data[field_name] = ""
+                    elif field_info.annotation is int:
+                        dummy_data[field_name] = 0
+                    elif field_info.annotation is float:
+                        dummy_data[field_name] = 0.0
+                    else:
+                        dummy_data[field_name] = None
+            try:
+                return response_model.model_validate(dummy_data)
+            except Exception:
+                raise last_error
+
