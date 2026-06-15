@@ -86,7 +86,7 @@ Output strictly in this JSON format: {"intent": "...", "order_id": "..."}"""
     )
 
     optimizer = VistaOptimizer(
-        model_name="openai/lightning-ai/gpt-oss-120b",
+        model_name="openai/lightning-ai/gpt-oss-20b",
         api_base="https://lightning.ai/api/v1/",
         config=config,
     )
