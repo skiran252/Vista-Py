@@ -181,12 +181,13 @@ class VistaOptimizer:
                 candidate_prompts,
                 eval_results,
                 parent_per_sample,
-                module,
-                current_instructions,
-                current_node_id,
-                dataset,
-                metric,
-                iteration,
+                parent_val_score=best_score,
+                module=module,
+                current_instructions=current_instructions,
+                parent_node_id=current_node_id,
+                dataset=dataset,
+                metric=metric,
+                iteration=iteration,
             )
 
             if best_candidate is not None:
@@ -317,6 +318,7 @@ class VistaOptimizer:
         candidate_prompts: List[str],
         eval_results: list,
         parent_per_sample: List[int],
+        parent_val_score: float,
         module: Predict,
         current_instructions: str,
         parent_node_id: str,
@@ -392,7 +394,7 @@ class VistaOptimizer:
         self.logger.log_iteration(
             iteration,
             current_instructions,
-            eval_results[best_idx][0],
+            parent_val_score,
             "heuristics",
             hyp_log,
             winner_prompt,
